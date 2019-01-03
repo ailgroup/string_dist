@@ -1,0 +1,10 @@
+[package]
+name = "string_dist"
+version = "0.1.0"
+authors = ["Joshua Bowles <jbowayles@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+array_tool = "~1.0.3"
+quickcheck = "0.2"
+rand = "0.3"
