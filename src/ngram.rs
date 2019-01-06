@@ -1,75 +1,87 @@
 use array_tool::vec::{Intersect, Union};
+use ndarray::Array1;
+
 /// Ngram is continuous sequence of n-items from a given sequence. The distance is the relative number of items between these two sequences.
 ///
 /// References:
 ///
-///	[N-Gram Similarity and Distance](https://webdocs.cs.ualberta.ca/~kondrak/papers/spire05.pdf)
-///	[Wikipedia n-gram](https://en.wikipedia.org/wiki/N-gram)
-///	[WolframAlpha n-gram](http://m.wolframalpha.com/input/?i=n-grams+%22n-gram+example+of+n-grams+in+wolfram+alpha%22&x=0&y=0)
-
+///	* [N-Gram Similarity and Distance](https://webdocs.cs.ualberta.ca/~kondrak/papers/spire05.pdf)
+///	* [Wikipedia n-gram](https://en.wikipedia.org/wiki/N-gram)
+///	* [WolframAlpha n-gram](http://m.wolframalpha.com/input/?i=n-grams+%22n-gram+example+of+n-grams+in+wolfram+alpha%22&x=0&y=0)
+///
 pub struct NGram {
-    pub s1: Vec<String>,
-    pub s2: Vec<String>,
-    pub s1_len: f64,
-    pub s2_len: f64,
+    pub n: usize,
+    pub string1: String,
+    pub string2: String,
+    pub sv1: Vec<String>,
+    pub sv2: Vec<String>,
+    pub sv1_len: f64,
+    pub sv2_len: f64,
     pub intersect: Vec<String>,
     pub union: Vec<String>,
     pub intersect_len: f64,
     pub union_len: f64,
     pub qgram: Qgram,
 }
+
+pub type QgramVec = Array1<f64>;
+//pub type StringVec<'a> = Array1<&'a str>;
 pub struct Qgram {
-    pub q1: Vec<usize>,
-    pub q2: Vec<usize>,
+    pub q1: QgramVec,
+    pub q2: QgramVec,
 }
 
 pub fn build(string1: &str, string2: &str, n: usize) -> NGram {
-    let mut tsg = NGram {
-        s1: Vec::with_capacity(string1.len() as usize),
-        s2: Vec::with_capacity(string2.len() as usize),
-        s1_len: 0.0,
-        s2_len: 0.0,
-        intersect: Vec::new(),
-        union: Vec::new(),
-        intersect_len: 0.0,
-        union_len: 0.0,
-        qgram: Qgram {
-            q1: Vec::new(),
-            q2: Vec::new(),
-        },
-    };
+    let mut sa1 = Vec::with_capacity(string1.len() as usize);
+    let mut sa2 = Vec::with_capacity(string2.len() as usize);
 
     for i in 0..((string1.len() - n) + 1) {
-        tsg.s1.push(string1[i..(i + n)].to_string());
+        sa1.push(string1[i..(i + n)].to_string());
     }
     for i in 0..((string2.len() - n) + 1) {
-        tsg.s2.push(string2[i..(i + n)].to_string());
+        sa2.push(string2[i..(i + n)].to_string());
     }
 
-    tsg.s1_len = tsg.s1.len() as f64;
-    tsg.s2_len = tsg.s2.len() as f64;
-    tsg.intersect = tsg.s1.intersect(tsg.s2.clone());
-    tsg.union = tsg.s1.union(tsg.s2.clone());
-    tsg.intersect_len = tsg.intersect.len() as f64;
-    tsg.union_len = tsg.union.len() as f64;
+    let sa1_len = sa1.len() as f64;
+    let sa2_len = sa2.len() as f64;
+    let intersect = sa1.intersect(sa2.clone());
+    let union = sa1.union(sa2.clone());
+    let int_len = intersect.len() as f64;
+    let un_len = union.len() as f64;
 
-    let cap = tsg.union_len as usize;
-    tsg.qgram.q1 = Vec::with_capacity(cap);
-    tsg.qgram.q2 = Vec::with_capacity(cap);
-    for c in &tsg.union {
-        if tsg.s1.contains(c) {
-            tsg.qgram.q1.push(1)
+    let mut qv1: Vec<f64> = Vec::with_capacity(un_len as usize);
+    let mut qv2: Vec<f64> = Vec::with_capacity(un_len as usize);
+    for c in &union {
+        if sa1.contains(c) {
+            qv1.push(1.0);
         } else {
-            tsg.qgram.q1.push(0)
+            qv1.push(0.0);
         }
-        if tsg.s2.contains(c) {
-            tsg.qgram.q2.push(1)
+
+        if sa2.contains(c) {
+            qv2.push(1.0);
         } else {
-            tsg.qgram.q2.push(0)
+            qv2.push(0.0);
         }
     }
 
-    tsg
+    NGram {
+        n: n,
+        string1: string1.to_string(),
+        string2: string2.to_string(),
+        sv1: sa1,
+        sv2: sa2,
+        sv1_len: sa1_len,
+        sv2_len: sa2_len,
+        intersect: intersect,
+        union: union,
+        intersect_len: int_len,
+        union_len: un_len,
+        qgram: Qgram {
+            q1: QgramVec::from_vec(qv1),
+            q2: QgramVec::from_vec(qv2),
+        },
+    }
 }
 
 impl NGram {
@@ -77,42 +89,25 @@ impl NGram {
     pub fn jaccard_distance(&self) -> f64 {
         1.0 - NGram::jaccard_similarity(&self)
     }
-    /// cosine_distance: 1 - cosine_similarity. higher socre is less similar.
+
+    /// cosine_distance: 1 - cosine_similarity. higher score is less similar.
     pub fn cosine_distance(&self) -> f64 {
         1.0 - NGram::cosine_similarity(&self)
     }
 
     /// jaccard_similarity: calculates jaccard coefficient, the similarity
-    /// of two sets as intersection divided by union: J(X,Y) = |X∩Y| / |X∪Y|.
+    /// of two sets as intersection divided by union:
+    /// ``` J(X,Y) = |X∩Y| / |X∪Y| ```
     /// higher score is more similar
     pub fn jaccard_similarity(&self) -> f64 {
         (&self.intersect_len / &self.union_len)
     }
-    /// cosine_similarity:
-    /// higher score is more similar
+
+    /// cosine_similarity: higher score is more similar
     pub fn cosine_similarity(&self) -> f64 {
-        let s1s1_mul: f64 = self
-            .qgram
-            .q1
-            .iter()
-            .zip(self.qgram.q1.iter())
-            .map(|(x, y)| (x * y) as f64)
-            .sum();
-        let s1s2_mul: f64 = self
-            .qgram
-            .q1
-            .iter()
-            .zip(self.qgram.q2.iter())
-            .map(|(x, y)| (x * y) as f64)
-            .sum();
-        let s2s2_mul: f64 = self
-            .qgram
-            .q2
-            .iter()
-            .zip(self.qgram.q2.iter())
-            .map(|(x, y)| (x * y) as f64)
-            .sum();
-        s1s2_mul / (s1s1_mul.sqrt() * s2s2_mul.sqrt())
+        let a = &self.qgram.q1;
+        let b = &self.qgram.q2;
+        (a * b).sum() / (((a * a).sum()).sqrt() * ((b * b).sum()).sqrt())
     }
 }
 
