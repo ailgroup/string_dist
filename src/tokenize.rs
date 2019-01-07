@@ -1,5 +1,8 @@
 struct TextSplitter;
 
+/*
+TODO roll in rust-unic for word separating
+*/
 impl TextSplitter {
     fn word_match(c: char) -> bool {
         match c {
