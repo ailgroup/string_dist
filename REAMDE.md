@@ -8,15 +8,12 @@
 ### todo
 * Mong Elken
 
-## X-Gram based
+### Token Based metrics
 
 * NGram
-    * QGram
-    * Jaccard
-    * Cosine
-
-
-### Token Based metrics
+* QGram
+* Jaccard
+* Cosine
 
 ### todo
 
