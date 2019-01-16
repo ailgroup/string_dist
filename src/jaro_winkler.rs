@@ -1,16 +1,13 @@
 use std::cmp::{max, min};
 
 /// jaro_winkler_distance: higher score is less similar.
+/// [jaro-winkler wikipedia](https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance)
 /// computes 6 parameters, 3 of which are calculated internally.
 /// s1_len,s2_len are the length of input string
 /// p is the prefix scale, ranges between [0,0.25], gives more favorable ratings to strings that match from the beginning for a set prefix length l.
 /// m is matching chars, the number of shared symbols
 /// t number of transpositions
 /// l is the length of common prefix, the number of symbols at beginning before first mismatch (max is 4)
-///
-///     References:
-///
-///     * [jaro-winkler wikipedia](https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance)
 ///
 /// jwd = 1 - (sim_j * (1 - l*p))
 /// this is more performant than the often defined jwd = 1 - sim_jwr due to less calculations in the jaro winkler similarity function.
@@ -48,9 +45,7 @@ fn calculate(a: f64, b: f64, m: f64, t: f64) -> f64 {
 }
 
 /// jaro_similarity: higher score is more similar.
-///     References:
-///
-///     * [jaro-winkler wikipedia](https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance)
+/// [jaro-winkler wikipedia](https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance)
 ///
 /// m is matching chars, the number of shared symbols
 /// t is number of needed transpositions fo shared symbols

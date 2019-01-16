@@ -1,5 +1,5 @@
+use crate::cosine::{Qgram, QgramVec};
 use array_tool::vec::{Intersect, Union};
-use ndarray::Array1;
 
 /// Ngram is continuous sequence of n-items from a given sequence. The distance is the relative number of items between these two sequences.
 ///
@@ -24,12 +24,13 @@ pub struct NGram {
     pub qgram: Qgram,
 }
 
+/*
 pub type QgramVec = Array1<f64>;
-//pub type StringVec<'a> = Array1<&'a str>;
 pub struct Qgram {
     pub q1: QgramVec,
     pub q2: QgramVec,
 }
+*/
 
 pub fn build(string1: &str, string2: &str, n: usize) -> NGram {
     let mut sa1 = Vec::with_capacity(string1.len() as usize);
@@ -78,8 +79,8 @@ pub fn build(string1: &str, string2: &str, n: usize) -> NGram {
         intersect_len: int_len,
         union_len: un_len,
         qgram: Qgram {
-            q1: QgramVec::from_vec(qv1),
-            q2: QgramVec::from_vec(qv2),
+            a: QgramVec::from_vec(qv1),
+            b: QgramVec::from_vec(qv2),
         },
     }
 }
@@ -105,8 +106,8 @@ impl NGram {
 
     /// cosine_similarity: higher score is more similar
     pub fn cosine_similarity(&self) -> f64 {
-        let a = &self.qgram.q1;
-        let b = &self.qgram.q2;
+        let a = &self.qgram.a;
+        let b = &self.qgram.b;
         (a * b).sum() / (((a * a).sum()).sqrt() * ((b * b).sum()).sqrt())
     }
 }
