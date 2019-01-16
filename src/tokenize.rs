@@ -1,3 +1,4 @@
+use crate::ratcliff_obershelp as ro;
 use std::collections::HashSet;
 struct TextSplitter;
 
@@ -9,76 +10,38 @@ struct TextSplitter;
     * [fuzzywuzzy rust](https://github.com/logannc/fuzzyrusty)
 */
 
-impl TextSplitter {
-    fn word_match(c: char) -> bool {
-        match c {
-            ' ' | ',' | '.' | '!' | '?' | ';' | '\'' | '"' | ':' | '\t' | '\n' | '(' | ')'
-            | '-' => true,
-            _ => false,
-        }
+/// return tuple with (shortest, longest) string
+fn order_by_len<'a>(s1: &'a str, s2: &'a str) -> (&'a str, &'a str) {
+    //shortest, longest
+    match s1.len() <= s2.len() {
+        true => (s1, s2),
+        _ => (s2, s1),
     }
-    fn word_to_tokens_match(c: char) -> bool {
-        match c {
-            ' ' | ',' | '.' | '(' | ')' | '-' => true,
-            _ => false,
-        }
-    }
-}
-/// words takes borrowed str and splits on word_match
-/// filtering out empty slots
-pub fn words(t: &str) -> Vec<&str> {
-    t.split(TextSplitter::word_match)
-        .filter(|s| !s.is_empty())
-        .collect()
-}
-
-/// tokens takes borrowed str and splits all
-/// filtering out empty slots
-pub fn tokens(t: &str) -> Vec<&str> {
-    t.split("").filter(|s| !s.is_empty()).collect()
-}
-
-/// split_tokens_lower takes borrowed str
-/// and uses custom splitter, collects, concats,
-/// then lowercase each str, returning new String
-pub fn tokens_lower(t: &str) -> String {
-    t.split(TextSplitter::word_to_tokens_match)
-        .collect::<Vec<&str>>()
-        .concat()
-        .split("")
-        .map(|s| s.to_lowercase())
-        .filter(|s| !s.is_empty()) //needed a split pads
-        .collect::<Vec<String>>()
-        .concat()
 }
 
 // RatcliffObserhelp distance
-// https://github.com/matthieugomez/StringDistances.jl/blob/2834265e96f18993a98a57d97e9f27a450a161d1/src/distances/RatcliffObershelp.jl#L54
 pub fn ratio(s1: &str, s2: &str) -> u8 {
-    let (shorter, longer) = if s1.len() <= s2.len() {
-        (s1, s2)
-    } else {
-        (s2, s1)
-    };
-    let matches: usize = get_matching_blocks(shorter, longer)
+    //total length
+    let sumlen = (s1.len() + s2.len()) as f32;
+    //find the shorter and longer
+    let (short, long) = order_by_len(s1, s2);
+    //iter, map, sum last block size
+    let similar: usize = ro::matching_blocks(short, long)
         .iter()
         .map(|&(_, _, s)| s)
         .sum();
-    let sumlength: f32 = (s1.len() + s2.len()) as f32;
-    if sumlength > 0.0 {
-        (100.0 * (2.0 * (matches as f32) / sumlength)).round() as u8
-    } else {
-        100
+    if sumlen > 0.0 {
+        return (100.0 * (2.0 * (similar as f32) / sumlen)).round() as u8;
     }
+    100
 }
 
 pub fn partial_ratio(s1: &str, s2: &str) -> u8 {
-    let (shorter, longer) = if s1.len() <= s2.len() {
-        (s1.to_string(), s2.to_string())
-    } else {
-        (s2.to_string(), s1.to_string())
+    let (shorter, longer) = match s1.len() <= s2.len() {
+        true => (s1, s2),
+        _ => (s2, s1),
     };
-    let blocks = get_matching_blocks(&shorter, &longer);
+    let blocks = ro::matching_blocks(&shorter, &longer);
     let mut max: u8 = 0;
     for (i, _, k) in blocks {
         let substr = &shorter[i..i + k];
@@ -91,6 +54,7 @@ pub fn partial_ratio(s1: &str, s2: &str) -> u8 {
     }
     max
 }
+
 pub fn token_sort_ratio(s1: &str, s2: &str, force_ascii: bool, full_process: bool) -> u8 {
     token_sort(s1, s2, false, force_ascii, full_process)
 }
@@ -131,10 +95,9 @@ fn token_sort(s1: &str, s2: &str, partial: bool, force_ascii: bool, process: boo
     let sorted1 = process_and_sort(s1, force_ascii, process);
     let sorted2 = process_and_sort(s2, force_ascii, process);
     if partial {
-        partial_ratio(sorted1.as_ref(), sorted2.as_ref())
-    } else {
-        ratio(sorted1.as_ref(), sorted2.as_ref())
+        return partial_ratio(sorted1.as_ref(), sorted2.as_ref());
     }
+    ratio(sorted1.as_ref(), sorted2.as_ref())
 }
 
 fn token_set(s1: &str, s2: &str, partial: bool, force_ascii: bool, process: bool) -> u8 {
@@ -200,83 +163,47 @@ fn pre_process(s: &str, force_ascii: bool) -> String {
     result.trim().to_string()
 }
 
-/*
-// use this to replace find_longest_match
-// Return start of commn substring in s1, start of common substring in s2, and length of substring
-// Indexes refer to character number, not index (differ for Unicode strings)
-fn longest_common_substring() -> (usize, usize, usize) {
-    //https://github.com/matthieugomez/StringDistances.jl/blob/2834265e96f18993a98a57d97e9f27a450a161d1/src/distances/RatcliffObershelp.jl#L3
-    (0, 0, 0)
-}
-*/
-
-fn find_longest_match<'a>(
-    shorter: &'a str,
-    longer: &'a str,
-    low1: usize,
-    high1: usize,
-    low2: usize,
-    high2: usize,
-) -> (usize, usize, usize) {
-    let longsub = &longer[low2..high2];
-    let slen = high1 - low1;
-    for size in (1..slen + 1).rev() {
-        for start in 0..slen - size + 1 {
-            let substr = &shorter[low1 + start..low1 + start + size];
-            let matches: Vec<(usize, &'a str)> = longsub.match_indices(substr).collect();
-            // Does this need to be sorted?
-            if let Some(&(startb, matchstr)) = matches.first() {
-                return (low1 + start, low2 + startb, matchstr.len());
-            }
+impl TextSplitter {
+    fn word_match(c: char) -> bool {
+        match c {
+            ' ' | ',' | '.' | '!' | '?' | ';' | '\'' | '"' | ':' | '\t' | '\n' | '(' | ')'
+            | '-' => true,
+            _ => false,
         }
     }
-    (low1, low2, 0)
-}
-
-/*
-// use this to replace get_matching_blocks
-fn matching_blocks() -> Vec<(usize, usize, usize)> {
-    //https://github.com/matthieugomez/StringDistances.jl/blob/2834265e96f18993a98a57d97e9f27a450a161d1/src/distances/RatcliffObershelp.jl#L31
-    vec![(0, 0, 0)]
-}
-*/
-
-fn get_matching_blocks<'a>(shorter: &'a str, longer: &'a str) -> Vec<(usize, usize, usize)> {
-    let (len1, len2) = (shorter.len(), longer.len());
-    let mut queue: Vec<(usize, usize, usize, usize)> = vec![(0, len1, 0, len2)];
-    let mut matching_blocks = Vec::new();
-    while let Some((low1, high1, low2, high2)) = queue.pop() {
-        let (i, j, k) = find_longest_match(shorter, longer, low1, high1, low2, high2);
-        if k != 0 {
-            matching_blocks.push((i, j, k));
-            if low1 < i && low2 < j {
-                queue.push((low1, i, low2, j));
-            }
-            if i + k < high1 && j + k < high2 {
-                queue.push((i + k, high1, j + k, high2));
-            }
+    fn word_to_tokens_match(c: char) -> bool {
+        match c {
+            ' ' | ',' | '.' | '(' | ')' | '-' => true,
+            _ => false,
         }
     }
-    matching_blocks.sort(); // Is this necessary?
-    let (mut i1, mut j1, mut k1) = (0, 0, 0);
-    let mut non_adjacent = Vec::new();
-    for (i2, j2, k2) in matching_blocks {
-        if i1 + k1 == i2 && j1 + k1 == j2 {
-            k1 += k2;
-        } else {
-            if k1 != 0 {
-                non_adjacent.push((i1, j1, k1));
-            }
-            i1 = i2;
-            j1 = j2;
-            k1 = k2;
-        }
-    }
-    if k1 != 0 {
-        non_adjacent.push((i1, j1, k1));
-    }
-    non_adjacent.push((len1, len2, 0));
-    non_adjacent
+}
+/// words takes borrowed str and splits on word_match
+/// filtering out empty slots
+pub fn words(t: &str) -> Vec<&str> {
+    t.split(TextSplitter::word_match)
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+/// tokens takes borrowed str and splits all
+/// filtering out empty slots
+pub fn tokens(t: &str) -> Vec<&str> {
+    t.split("").filter(|s| !s.is_empty()).collect()
+}
+
+/// split_tokens_lower takes borrowed str
+/// and uses custom splitter, collects, concats,
+/// then lowercase each str, returning new String
+pub fn tokens_lower(t: &str) -> String {
+    t.split(TextSplitter::word_to_tokens_match)
+        .collect::<Vec<&str>>()
+        .concat()
+        .split("")
+        .map(|s| s.to_lowercase())
+        .filter(|s| !s.is_empty()) //needed a split pads
+        .collect::<Vec<String>>()
+        .concat()
 }
 
 #[cfg(test)]

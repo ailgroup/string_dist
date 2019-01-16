@@ -2,6 +2,7 @@ pub mod cosine;
 pub mod hamming;
 pub mod jaro_winkler;
 pub mod ngram;
+pub mod ratcliff_obershelp;
 pub mod tokenize;
 
 #[cfg(test)]
