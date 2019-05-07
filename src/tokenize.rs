@@ -9,6 +9,7 @@ use std::cmp::Ordering;
     * [fuzzywuzzy py](https://github.com/seatgeek/fuzzywuzzy)
     * [fuzzywuzzy julia](https://github.com/matthieugomez/StringDistances.jl)
     * [fuzzywuzzy rust](https://github.com/logannc/fuzzyrusty)
+    * [text analysis in rust](https://nitschinger.at/Text-Analysis-in-Rust-Tokenization)
 */
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -277,23 +278,21 @@ impl<'a> TokenCmp<'a> {
     pub fn new_set_join(
         cow1: Vec<std::borrow::Cow<'a, str>>,
         cow2: Vec<std::borrow::Cow<'a, str>>,
-        sep: &str,
     ) -> Self {
         TokenCmp {
-            term1: Cow::from(cow1.iter().as_ref().join(sep)),
-            term2: Cow::from(cow2.iter().as_ref().join(sep)),
+            term1: Cow::from(cow1.iter().as_ref().join(" ")),
+            term2: Cow::from(cow2.iter().as_ref().join(" ")),
         }
     }
     pub fn new_sort_join(
         mut cow1: Vec<std::borrow::Cow<'a, str>>,
         mut cow2: Vec<std::borrow::Cow<'a, str>>,
-        sep: &str,
     ) -> Self {
         cow1.sort();
         cow2.sort();
         TokenCmp {
-            term1: Cow::from(cow1.iter().as_ref().join(sep)),
-            term2: Cow::from(cow2.iter().as_ref().join(sep)),
+            term1: Cow::from(cow1.iter().as_ref().join(" ")),
+            term2: Cow::from(cow2.iter().as_ref().join(" ")),
         }
     }
     pub fn new_from_str(s1: &'a str, s2: &'a str) -> Self {
@@ -465,7 +464,7 @@ impl<'a> TokenizerNaive {
             .join(" ")
     }
 
-    pub fn tokens(t: &'a str) -> Vec<&'a str> {
+    pub fn chars(t: &'a str) -> Vec<&'a str> {
         t.split("").filter(|s| !s.is_empty()).collect()
     }
 
@@ -591,30 +590,37 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn word_split(c: char) -> bool {
-        match c {
-            '\n' | '|' | '-' => true,
-            _ => false,
-        }
-    }
-    fn tokens_filter(c: char) -> bool {
-        match c {
-            '-' | '|' | '*' | ')' | '(' | '&' => true,
-            _ => false,
-        }
-    }
-
-    // fn ant() -> AlphaNumericTokenizer {
-    //     AlphaNumericTokenizer
-    // }
-
     #[test]
-    fn tokenizer_sequencer() {
-        let an = AlphaNumericTokenizer;
-        let one = an.sequencer("Marriot &Beaches Resort|").join(" ");
-        let two = an.sequencer("Marriot& Beaches^ Resort").join(" ");
-        assert_eq!(one, two);
+    fn on_word_splitter() {
+        fn word_split(c: char) -> bool {
+            match c {
+                '\n' | '|' | '-' => true,
+                _ => false,
+            }
+        }
+        let res = TokenizerNaive::word_splitter("HelLo|tHere", &word_split);
+        assert_eq!(res, vec!["HelLo", "tHere"])
+    }
+    #[test]
+    fn on_tokens_lower_filter() {
+        fn tokens_filter(c: char) -> bool {
+            match c {
+                '-' | '|' | '*' | ')' | '(' | '&' => true,
+                _ => false,
+            }
+        }
+        let res = TokenizerNaive::tokens_lower_with_filter("|HelLo tHere", &tokens_filter);
+        assert_eq!(res, " hello there");
+
+        let res1 = TokenizerNaive::tokens_lower_with_filter("HelLo|tHere", &tokens_filter);
+        assert_eq!(res1, "hello there");
+
+        let res2 = TokenizerNaive::tokens_lower_with_filter("HelLo tHere", &tokens_filter);
+        assert_eq!(res2, "hello there");
+
+        let res6 =
+            TokenizerNaive::tokens_lower_with_filter("****HelLo *() $& )(tH*ere", &tokens_filter);
+        assert_eq!(res6, "    hello     $    th ere");
     }
 
     #[test]
@@ -659,45 +665,39 @@ mod tests {
     #[test]
     fn on_tokens_simple() {
         assert_eq!(
-            TokenizerNaive::tokens("hello there"),
+            TokenizerNaive::chars("hello there"),
             ["h", "e", "l", "l", "o", " ", "t", "h", "e", "r", "e"]
+        );
+        assert_eq!(
+            TokenizerNaive::chars("hello there").concat(),
+            String::from("hello there")
         )
     }
 
     #[test]
-    fn on_tokens_lower_filter() {
-        let res = TokenizerNaive::tokens_lower_with_filter("|HelLo tHere", &tokens_filter);
-        assert_eq!(res, " hello there");
-
-        let res1 = TokenizerNaive::tokens_lower_with_filter("HelLo|tHere", &tokens_filter);
-        assert_eq!(res1, "hello there");
-
-        let res2 = TokenizerNaive::tokens_lower_with_filter("HelLo tHere", &tokens_filter);
-        assert_eq!(res2, "hello there");
-
-        let res6 =
-            TokenizerNaive::tokens_lower_with_filter("****HelLo *() $& )(tH*ere", &tokens_filter);
-        assert_eq!(res6, "    hello     $    th ere");
-    }
-
-    #[test]
-    fn on_word_splitter() {
-        let res = TokenizerNaive::word_splitter("HelLo|tHere", &word_split);
-        assert_eq!(res, vec!["HelLo", "tHere"])
-    }
-
-    #[test]
     fn on_similarity_identity() {
-        let t = TokenCmp::new_from_str("hello", "hello");
-        assert_eq!(t.similarity(), 100);
+        assert_eq!(TokenCmp::new_from_str("hello", "hello").similarity(), 100);
     }
 
     #[test]
     fn on_similarity_high() {
-        let t = TokenCmp::new_from_str("hello b", "hello");
-        assert_eq!(t.similarity(), 83);
+        assert_eq!(TokenCmp::new_from_str("hello b", "hello").similarity(), 83);
+        assert_eq!(
+            TokenCmp::new_from_str("this is a test", "this is a test!").similarity(),
+            97
+        );
+        assert_eq!(
+            TokenCmp::new_from_str("fuzzy wuzzy was a bear", "wuzzy fuzzy was a bear").similarity(),
+            91
+        );
     }
-
+    #[test]
+    fn on_token_sequencer() {
+        let an = AlphaNumericTokenizer;
+        let one = an.sequencer("Marriot &Beaches Resort|").join(" ");
+        let two = an.sequencer("Marriot& Beaches^ Resort").join(" ");
+        assert_eq!(one, two);
+    }
     #[test]
     fn on_token_sort() {
         let s1 = "Marriot Beaches Resort foo";
@@ -706,7 +706,14 @@ mod tests {
         let sim = token_sort(s1, s2, &TokenCmp::new_sort, &TokenCmp::similarity);
         assert_eq!(sim, 87);
     }
-
+    #[test]
+    fn on_token_sort_again() {
+        let s1 = "great is scala";
+        let s2 = "java is great";
+        assert_eq!(TokenCmp::new_from_str(s1, s2).similarity(), 37);
+        let sim = token_sort(s1, s2, &TokenCmp::new_sort_join, &TokenCmp::similarity);
+        assert_eq!(sim, 81);
+    }
     #[test]
     fn on_amstel_match_for_nate() {
         let sabre = "INTERCONTINENTAL AMSTEL AMS";
