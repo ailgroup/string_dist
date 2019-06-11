@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 array_tool = "~1.0.3"
+arrayvec = "0.4.10"
 quickcheck = "~0.2"
 rand = "~0.3"
 ndarray = "~0.12.1"

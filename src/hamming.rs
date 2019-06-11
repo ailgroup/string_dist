@@ -7,10 +7,10 @@
 /// See also [kimwalisch popcount64](https://github.com/kimwalisch/primesieve/blob/5062c611402f391f531dd1d081c6969115f7d40c/src/popcount.cpp#L21)
 #[inline]
 pub fn popcount_mult(mut x: u64) -> u64 {
-    let m1: u64 = 0x5555555555555555; //binary: 0101...
-    let m2: u64 = 0x3333333333333333; //binary: 00110011..
-    let m4: u64 = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
-    let h01: u64 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
+    let m1: u64 = 0x5555_5555_5555_5555; //binary: 0101...
+    let m2: u64 = 0x3333_3333_3333_3333; //binary: 00110011..
+    let m4: u64 = 0x0f0f_0f0f_0f0f_0f0f; //binary:  4 zeros,  4 ones ...
+    let h01: u64 = 0x0101_0101_0101_0101; //the sum of 256 to the power of 0,1,2,3...
     x -= (x >> 1) & m1; //count of each two bits into those 2 bits
     x = (x & m2) + ((x >> 2) & m2); //put count of each 4 bits
 
@@ -27,7 +27,7 @@ pub trait HammingWeight {
 impl HammingWeight for u64 {
     /// native uses rust native `count_ones()`.
     fn native(&self) -> u64 {
-        self.count_ones() as u64
+        u64::from(self.count_ones())
     }
     /// popcount uses `popcount_mult()`.
     fn popcount(&self) -> u64 {
@@ -37,17 +37,17 @@ impl HammingWeight for u64 {
 impl HammingWeight for u32 {
     /// native uses rust native `count_ones()`.
     fn native(&self) -> u64 {
-        self.count_ones() as u64
+        u64::from(self.count_ones())
     }
     /// popcount uses `popcount_mult()`.
     fn popcount(&self) -> u64 {
-        popcount_mult(*self as u64)
+        popcount_mult(u64::from(*self))
     }
 }
 impl HammingWeight for &[u8] {
     /// native iterates over vector and folds `count_ones()`.
     fn native(&self) -> u64 {
-        self.iter().fold(0, |a, b| a + b.count_ones() as u64)
+        self.iter().fold(0, |a, b| a + u64::from(b.count_ones()))
     }
     /// popcount uses Lauradoux [tree-merging approach](http://web.archive.org/web/20120411185540/http://perso.citi.insa-lyon.fr/claurado/hamming.html)
     /// to compute bitwise [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance)
@@ -66,10 +66,10 @@ impl HammingWeight for &[u8] {
 /// lauradoux_for_weight uses a tree-merge approach... needs to be benchmarked
 /// See Lauradoux Cédric's [tree-merging approach](http://web.archive.org/web/20120411185540/http://perso.citi.insa-lyon.fr/claurado/hamming.html)
 fn lauradoux_for_weight(buffer: [[u64; 30]; 1], mut count: u64) -> u64 {
-    let m1: u64 = 0x5555555555555555; //binary: 0101...
-    let m2: u64 = 0x3333333333333333; //binary: 00110011..
-    let m4: u64 = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
-    let m8: u64 = 0x00ff00ff00ff00ff; //binary:  8 zeros,  8 ones ...
+    let m1: u64 = 0x5555_5555_5555_5555; //binary: 0101...
+    let m2: u64 = 0x3333_3333_3333_3333; //binary: 00110011..
+    let m4: u64 = 0x0f0f_0f0f_0f0f_0f0f; //binary:  4 zeros,  4 ones ...
+    let m8: u64 = 0x00ff_00ff_00ff_00ff; //binary:  8 zeros,  8 ones ...
     for buf in buffer.iter() {
         let mut accum = 0;
         for _j in 0..10 {
@@ -118,7 +118,7 @@ pub fn distance_native(x: &[u8], y: &[u8]) -> Result<u64, DistanceError> {
     let d = x
         .iter()
         .zip(y)
-        .fold(0, |a, (b, c)| a + (*b ^ *c).count_ones() as u64);
+        .fold(0, |a, (b, c)| a + u64::from((*b ^ *c).count_ones()));
     Ok(d)
 }
 
@@ -144,17 +144,17 @@ pub fn lauradoux_for_distance(x: &[u8], y: &[u8]) -> Result<u64, DistanceError> 
     };
     let mut count = c_head + c_tail;
 
-    let m1: u64 = 0x5555555555555555; //binary: 0101...
-    let m2: u64 = 0x3333333333333333; //binary: 00110011..
-    let m4: u64 = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
-    let m8: u64 = 0x00ff00ff00ff00ff; //binary:  8 zeros,  8 ones ...
+    let m1: u64 = 0x5555_5555_5555_5555; //binary: 0101...
+    let m2: u64 = 0x3333_3333_3333_3333; //binary: 00110011..
+    let m4: u64 = 0x0f0f_0f0f_0f0f_0f0f; //binary:  4 zeros,  4 ones ...
+    let m8: u64 = 0x00ff_00ff_00ff_00ff; //binary:  8 zeros,  8 ones ...
     for (buf1, buf2) in buffer1.iter().zip(&buffer2) {
         let mut accum = 0;
         for _j in 0..10 {
             let j = _j * 3;
             let mut c1 = buf1[j] ^ buf2[j];
             let mut c2 = buf1[j + 1] ^ buf2[j + 1];
-            let mut half1 = buf1[j + 2] ^ buf1[j + 2];
+            let mut half1 = buf1[j + 2] ^ buf2[j + 2];
             let mut half2 = half1;
             half1 &= m1;
             half2 = (half2 >> 1) & m1;
@@ -202,7 +202,7 @@ mod tests {
     use quickcheck as qc;
     use rand;
     #[test]
-    fn native_weight() {
+    fn hmnative_weight() {
         let tests = [
             (&[0u8] as &[u8], 0),
             (&[1], 1),
@@ -215,7 +215,7 @@ mod tests {
         }
     }
     #[test]
-    fn native_popcount_qcheck() {
+    fn hmnative_popcount_qcheck() {
         fn prop(v: Vec<u8>, misalign: u8) -> qc::TestResult {
             let data = &v[(misalign as usize % 16)..];
             qc::TestResult::from_bool(
@@ -227,12 +227,12 @@ mod tests {
             .quickcheck(prop as fn(Vec<u8>, u8) -> qc::TestResult)
     }
     #[test]
-    fn weight_huge() {
-        let v = vec![0b1001_1101; 10234567];
+    fn hmweight_huge() {
+        let v = vec![0b1001_1101; 10_234_567];
         //let v = vec![204; 10234567];
         assert_eq!(
             super::HammingWeight::popcount(&&v[..]),
-            v[0].count_ones() as u64 * v.len() as u64
+            u64::from(v[0].count_ones()) * v.len() as u64
         );
         //assert_eq!(51172835 as u64, v[0].count_ones() as u64 * v.len() as u64);
     }
