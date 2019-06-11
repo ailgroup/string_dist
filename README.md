@@ -1,3 +1,11 @@
+# string_dist
+This package contains alot of refactored or re-implemented stirng distance algorithms found in the existing rust ecosystem. I've tried to point out where the original ideas or implementations came from. 
+
+The rational for not doing pull requests to original projects is twofold:
+
+1. my changes were often so pervasive that a PR would probably have been rude
+2. I needed (or will need) some common interfaces or inter-functionality between algos and maintaining a meta-package of forked projects that were all but gutted in many places did not make sense.
+
 ## Edit distances char-based
 
 * Hamming
@@ -19,6 +27,10 @@
 
 * TFIDF
 * Jensen-Shannon
+
+## Maximum Likelihood Estimation for Ngram Models
+### todo
+yes, see if the NGram token comparison can fit into an NGram model with log-likelihood and MLE...>
 
 
 ## substring
