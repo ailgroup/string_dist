@@ -1,5 +1,5 @@
 # string_dist
-Work in progress. Provides string distance algos to support a "product matching" data processing framework.
+Work in progress. Provides string distance algos. This is a custom project to support specific needs in a "product matching" data processing framework as well as for supporting algos in a back-office insurance form OCR project.
 
 ### A Note
 This package contains alot of refactored or re-implemented string distance algorithms found in the existing rust ecosystem. I've tried to point out where the original ideas or implementations came from. 
